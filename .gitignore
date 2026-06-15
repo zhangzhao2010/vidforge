@@ -44,3 +44,11 @@ Thumbs.db
 
 # --- Local test sample assets (not part of the repo) ---
 /resources/
+
+# --- AI-DLC 工作流文档与规则（仅本地，不入库） ---
+/.aidlc-rule-details/
+/aidlc-docs/
+/.aidlc/
+/.kiro/
+/.amazonq/
+/CLAUDE.md
