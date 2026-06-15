@@ -80,9 +80,10 @@ export function TaskDetailView({ task }: { task: Task }) {
   );
 
   return (
-    <Row gutter={16} style={{ height: '100%' }}>
+    // wrap=false：窗口变窄时右列绝不折行到第二行（否则会落到 overflow:hidden 的可视区外，表现为右侧消失）
+    <Row gutter={16} wrap={false} style={{ height: '100%' }}>
       {/* 左：配置 */}
-      <Col flex="380px" style={{ height: '100%', overflow: 'auto' }}>
+      <Col flex="0 0 380px" style={{ height: '100%', overflow: 'auto' }}>
         <Card title={<Space><Tag color="purple">{t(`cap.${cap}`)}</Tag>{t('detail.config')}</Space>}>
           <Form layout="vertical">
             {promptRequired ? (
@@ -133,8 +134,8 @@ export function TaskDetailView({ task }: { task: Task }) {
         </Card>
       </Col>
 
-      {/* 右：生成结果 */}
-      <Col flex="auto" style={{ height: '100%', overflow: 'auto' }}>
+      {/* 右：生成结果。minWidth:0 让 flex 子项可收缩（默认 min-width:auto 会撑破容器导致折行） */}
+      <Col flex="auto" style={{ height: '100%', overflow: 'auto', minWidth: 0 }}>
         <Card title={t('detail.results')} bodyStyle={{ paddingBottom: 0 }}>
           {hasActive && generations.some((g) => ['QUEUED', 'SUBMITTING', 'PENDING', 'RUNNING', 'DOWNLOADING'].includes(g.status)) && (
             <Alert type="info" showIcon message={t('msg.generating')} style={{ marginBottom: 16 }} />
