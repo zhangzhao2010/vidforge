@@ -1,7 +1,7 @@
 // renderer — 任务详情页：左 = 配置（按任务固定能力，无顶部切换）；右 = 生成结果竖向卡片。
 // 串行约束：全局已有生成在跑时，提交按钮禁用并提示。
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Row, Col, Card, Form, Input, Button, Space, Tag, Empty, message, Tooltip, Alert } from 'antd';
 import { useTranslation } from 'react-i18next';
 import type { Task, GenParams, MediaInput } from '@shared/types';
@@ -26,6 +26,19 @@ export function TaskDetailView({ task }: { task: Task }) {
   const [media, setMedia] = useState<MediaInput[]>([]);
   const [params, setParams] = useState<Partial<GenParams>>({});
   const [submitting, setSubmitting] = useState(false);
+
+  // 进入任务详情页后，用「最后一次生成配置」自动回填表单（prompt + 参数 + 素材，全量复刻）。
+  // 只填一次：generations 异步到位后执行首次回填，之后不再覆盖，避免冲掉用户编辑或提交后被重置。
+  const prefilled = useRef(false);
+  useEffect(() => {
+    if (prefilled.current || generations.length === 0) return;
+    prefilled.current = true;
+    const last = [...generations].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+    const { capability, prompt: p, media: m, ...rest } = last.params;
+    setPrompt(p ?? '');
+    setMedia(m ?? []);
+    setParams(rest);
+  }, [generations]);
 
   const promptRequired = cap === 't2v' || cap === 'r2v' || cap === 'video-edit';
 
