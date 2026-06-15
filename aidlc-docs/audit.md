@@ -123,3 +123,11 @@ https://help.aliyun.com/zh/model-studio/happyhorse-video-edit-api-reference"
 **Timestamp**: 2026-06-15T05:30:00Z
 **AI Response**: "Implemented all 5 units + scaffold. ENV ISSUE encountered & fixed: npm install failed with 'make: g++: Command not found' (native modules better-sqlite3/keytar) → installed gcc-c++ via passwordless sudo dnf → reinstall succeeded (sqlite + keytar .node compiled). Created .gitignore earlier. Wrote PBT (fast-check) for core-config/api-client/task-engine + integration test for task-engine. Fixed: (1) ConfigManager lazy-requires electron to avoid pulling electron binary into pure-logic tests; (2) preload forced to CJS .js output (sandbox preload cannot be ESM); (3) main index poller/engine circular init typed. Results: 15 tests pass (12 PBT + 3 integration), typecheck pass, electron-vite build pass (main 36KB/preload 2.4KB/renderer 1.8MB). Wrote README.md + build-and-test-summary.md."
 **Context**: CONSTRUCTION Phase complete — all units implemented, tested, built
+
+---
+
+## v1 Local Verification Passed & Committed
+**Timestamp**: 2026-06-15T15:20:00Z
+**User Input**: "git push -u origin feat/initial-implementation" (executed by user) + "第一版本功能测试通过。整理一下各种文档和开发记录啥的,然后开启新session以进行新的迭代"
+**AI Response**: "User verified v1 works on local Mac/Windows. Branch feat/initial-implementation committed (db57f06) and pushed to origin. Wrapping up: updated aidlc-state.md to v1 COMPLETE, wrote dev-log / iteration handoff doc, saved persistent memories for next-session continuity. Noted new resources/ dir (2 sample images for i2v demo) appeared from user's local testing."
+**Context**: v1 shipped — closing out session, preparing for v2 iteration in a new session

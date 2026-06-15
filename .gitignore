@@ -39,3 +39,6 @@ Thumbs.db
 # --- Local user data (downloaded videos, task db during dev) ---
 /local-data/
 *.local
+
+# --- Local test sample assets (not part of the repo) ---
+/resources/

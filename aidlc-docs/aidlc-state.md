@@ -2,10 +2,10 @@
 
 ## Project Information
 - **Project Name**: vidforge
-- **Project Type**: Greenfield
+- **Project Type**: Greenfield → Brownfield (v1 shipped)
 - **Start Date**: 2026-06-15T00:00:00Z
-- **Current Phase**: INCEPTION
-- **Current Stage**: Requirements Analysis
+- **Current Phase**: v1 COMPLETE — ready for next iteration
+- **Current Stage**: Idle (awaiting v2 requirements in a new session)
 
 ## Workspace State
 - **Existing Code**: No
@@ -35,11 +35,10 @@ PBT framework for TS/JS: fast-check (per PBT-09).
 - **Initial Units (tentative)**: core-config, api-client, task-engine, media-store, ui
 
 ## Current Status
-- **Lifecycle Phase**: INCEPTION
-- **Lifecycle Phase**: CONSTRUCTION
-- **Current Stage**: U1 core-config — Functional Design (Part 1 planning)
-- **Next Stage**: U1 NFR Requirements
-- **Status**: FD plan created for U1, awaiting answers. Code org: single npm package, src/{shared,main/{core-config,api-client,task-engine,media-store},preload,renderer}. Build order: U1→U2→U3→U4→U5.
+- **Lifecycle Phase**: v1 COMPLETE
+- **Status**: 第一版功能在本地（Mac/Windows）测试通过，已提交并推送到 origin/feat/initial-implementation。
+- **Code org**: single npm package, src/{shared,main/{core-config,api-client,task-engine,media-store},preload,renderer}. Build order followed U1→U2→U3→U4→U5.
+- **Next**: 新 session 进行 v2 迭代。届时为 Brownfield，按 AI-DLC 应先做 Reverse Engineering（或直接复用本文档与现有设计工件作为上下文）。
 
 ## Per-Unit Construction Progress (autonomous mode — recommended options)
 - [x] U1 core-config: ConfigManager + KeyVault (+ resolveEndpoint PBT)
@@ -68,12 +67,12 @@ Electron strict process isolation (main=secrets/network/files, renderer=UI only,
 - [x] Units Generation - EXECUTE (approved)
 
 ### 🟢 CONSTRUCTION PHASE
-- [ ] Functional Design - EXECUTE (per-unit)
-- [ ] NFR Requirements - EXECUTE (per-unit)
-- [ ] NFR Design - EXECUTE (per-unit)
-- [ ] Infrastructure Design - SKIP
-- [ ] Code Generation - EXECUTE (per-unit)
-- [ ] Build and Test - EXECUTE
+- [x] Functional Design - condensed per-unit (autonomous mode)
+- [x] NFR Requirements - folded into FD/code (fast-check selected; keychain; concurrency=3; poll 15s)
+- [x] NFR Design - folded into code (process isolation, retry, polling throttle, persistence)
+- [x] Infrastructure Design - SKIP
+- [x] Code Generation - EXECUTE (all 5 units)
+- [x] Build and Test - 15 tests pass, typecheck pass, build pass; v1 manually verified on local Mac/Win
 
 ### 🟡 OPERATIONS PHASE
 - [ ] Operations - PLACEHOLDER
