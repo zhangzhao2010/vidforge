@@ -1,0 +1,52 @@
+{
+  "name": "vidforge",
+  "version": "0.1.0",
+  "description": "跨平台桌面客户端，使用阿里云百炼 HappyHorse 模型生成视频 / Cross-platform desktop client for video generation via Aliyun Model Studio HappyHorse",
+  "author": "vidforge",
+  "license": "MIT",
+  "main": "out/main/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "package": "electron-vite build && electron-builder",
+    "package:mac": "electron-vite build && electron-builder --mac",
+    "package:win": "electron-vite build && electron-builder --win"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.8.1",
+    "keytar": "^7.9.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.10.5",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "antd": "^5.23.0",
+    "electron": "^33.3.0",
+    "electron-builder": "^25.1.8",
+    "electron-vite": "^2.3.0",
+    "fast-check": "^3.23.2",
+    "i18next": "^24.2.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-i18next": "^15.4.0",
+    "typescript": "^5.7.3",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.8",
+    "zustand": "^5.0.3"
+  },
+  "build": {
+    "appId": "com.vidforge.app",
+    "productName": "VidForge",
+    "directories": { "output": "release" },
+    "files": ["out/**/*", "package.json"],
+    "mac": { "target": ["dmg"], "category": "public.app-category.graphics-design" },
+    "win": { "target": ["nsis"] }
+  }
+}
