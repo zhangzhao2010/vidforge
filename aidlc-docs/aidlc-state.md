@@ -76,3 +76,20 @@ Electron strict process isolation (main=secrets/network/files, renderer=UI only,
 
 ### 🟡 OPERATIONS PHASE
 - [ ] Operations - PLACEHOLDER
+
+---
+
+## v2 Iteration — Task-centric Refactor (2026-06-15)
+**Status**: CONSTRUCTION complete — typecheck + 27 tests + build green; awaiting user local GUI verification.
+
+### Locked Decisions (v2)
+- 两层领域模型：`Task`（容器，capability 创建时固定）+ `Generation`（单次运行，原 `TaskRecord` 重命名，加 `taskId` 外键；远端 task_id 字段重命名 `taskRemoteId` 避免与容器 FK 冲突）。
+- 并发策略：`MAX_CONCURRENT = 1`（全局同时只跑一个生成，前一个终态后泵起下一个）。
+- 旧数据：清空重来（Persistence.migrate 检测 v1 扁平 tasks 表无 name 列即 drop 重建；删除 history 表）。
+- 任务命名：占位名 `unnamed::{cap}::{iso}`，首次生成 prompt 非空时 `deriveTaskName` 回填（用户手改后不再覆盖）。
+- 本地媒体播放：`vidforge-media://` 自定义协议（registerSchemesAsPrivileged + protocol.handle + net.fetch），仅允许 userData 子路径（`resolveMediaPath` 防目录穿越），不放开 sandbox/webSecurity。
+- 素材持久化：提交时 file 源拷进 `userData/assets/`（`MediaStore.persistAsset`），改写 path、保留 originalPath。
+- UI：左导航顶部「创建任务」按钮 + 「任务」可折叠列表 + 设置；移除「历史」。详情页左配置（固定 capability，无 Tabs）/ 右结果竖向 GenerationCard。
+
+### Result (v2)
+27 tests pass（原 15 → 27）；typecheck pass；electron-vite build pass（main 41.6KB）。PBT 价值体现：抓出 startsWith('..') 误杀 '..a' 合法文件名的真 bug，改为按路径段判断。

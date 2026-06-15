@@ -2,7 +2,7 @@
 
 import { contextBridge, ipcRenderer } from 'electron';
 import { IPC } from '@shared/ipc';
-import type { GenParams, Profile, AppConfig, TaskRecord, HistoryItem } from '@shared/types';
+import type { GenParams, Profile, AppConfig, Task, Generation, Capability } from '@shared/types';
 
 /** 统一的 invoke 包装：解开 {ok,data,error} 信封，失败则 reject 一个可读错误 */
 async function invoke<T>(channel: string, payload?: unknown): Promise<T> {
@@ -17,19 +17,24 @@ async function invoke<T>(channel: string, payload?: unknown): Promise<T> {
 }
 
 const api = {
-  submitTask: (params: GenParams) => invoke<{ localId: string }>(IPC.TASK_SUBMIT, params),
-  cancelTask: (localId: string) => invoke<void>(IPC.TASK_CANCEL, localId),
-  retryTask: (localId: string) => invoke<void>(IPC.TASK_RETRY, localId),
-  listTasks: () => invoke<TaskRecord[]>(IPC.TASK_LIST),
+  // 任务容器
+  createTask: (capability: Capability, name?: string) => invoke<Task>(IPC.TASK_CREATE, { capability, name }),
+  listTaskContainers: () => invoke<Task[]>(IPC.TASK_CONTAINER_LIST),
+  deleteTask: (taskId: string) => invoke<void>(IPC.TASK_DELETE, taskId),
+  renameTask: (taskId: string, name: string) => invoke<void>(IPC.TASK_RENAME, { taskId, name }),
 
-  listHistory: () => invoke<HistoryItem[]>(IPC.HISTORY_LIST),
-  regenerateFrom: (historyId: string) => invoke<{ localId: string }>(IPC.HISTORY_REGENERATE, historyId),
-  openInFolder: (historyId: string) => invoke<void>(IPC.HISTORY_OPEN_FOLDER, historyId),
-  retryDownload: (localId: string) => invoke<void>(IPC.HISTORY_RETRY_DOWNLOAD, localId),
+  // 生成
+  submitGeneration: (taskId: string, params: GenParams) =>
+    invoke<{ localId: string }>(IPC.GENERATION_SUBMIT, { taskId, params }),
+  listGenerationsByTask: (taskId: string) => invoke<Generation[]>(IPC.GENERATION_LIST_BY_TASK, taskId),
+  listAllGenerations: () => invoke<Generation[]>(IPC.GENERATION_LIST_ALL),
+  cancelGeneration: (localId: string) => invoke<void>(IPC.GENERATION_CANCEL, localId),
+  retryGeneration: (localId: string) => invoke<void>(IPC.GENERATION_RETRY, localId),
+  openInFolder: (localId: string) => invoke<void>(IPC.GENERATION_OPEN_FOLDER, localId),
 
+  // 配置 / Profile
   getConfig: () => invoke<AppConfig>(IPC.CONFIG_GET),
   updateConfig: (patch: Partial<AppConfig>) => invoke<AppConfig>(IPC.CONFIG_UPDATE, patch),
-
   listProfiles: () => invoke<Profile[]>(IPC.PROFILE_LIST),
   upsertProfile: (p: Profile) => invoke<Profile>(IPC.PROFILE_UPSERT, p),
   deleteProfile: (id: string) => invoke<void>(IPC.PROFILE_DELETE, id),
@@ -40,11 +45,18 @@ const api = {
   pickFiles: (opts: { filters?: { name: string; extensions: string[] }[]; multi?: boolean }) =>
     invoke<string[]>(IPC.PICK_FILES, opts),
 
-  /** 订阅任务更新事件，返回取消订阅函数 */
-  onTaskUpdate: (cb: (t: TaskRecord) => void): (() => void) => {
-    const listener = (_e: unknown, t: TaskRecord) => cb(t);
-    ipcRenderer.on(IPC.EVT_TASK_UPDATED, listener);
-    return () => ipcRenderer.removeListener(IPC.EVT_TASK_UPDATED, listener);
+  /** 订阅单条生成更新事件，返回取消订阅函数 */
+  onGenerationUpdate: (cb: (g: Generation) => void): (() => void) => {
+    const listener = (_e: unknown, g: Generation) => cb(g);
+    ipcRenderer.on(IPC.EVT_GENERATION_UPDATED, listener);
+    return () => ipcRenderer.removeListener(IPC.EVT_GENERATION_UPDATED, listener);
+  },
+
+  /** 订阅任务容器列表更新事件，返回取消订阅函数 */
+  onTaskListUpdate: (cb: (tasks: Task[]) => void): (() => void) => {
+    const listener = (_e: unknown, tasks: Task[]) => cb(tasks);
+    ipcRenderer.on(IPC.EVT_TASK_LIST_UPDATED, listener);
+    return () => ipcRenderer.removeListener(IPC.EVT_TASK_LIST_UPDATED, listener);
   }
 };
 

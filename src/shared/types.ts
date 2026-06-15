@@ -22,11 +22,14 @@ export type TaskStatus =
   | 'EXPIRED' // 超 24h，task_id/video_url 失效
   | 'CANCELLED'; // 用户取消
 
-/** 媒体素材输入。文件以路径传入（renderer→main），main 内读取并转 Base64 */
+/** 媒体素材输入。文件以路径传入（renderer→main），main 内读取并转 Base64。
+ *  提交时 main 会把 file 源拷贝进 userData/assets 持久化，path 改写为副本路径，
+ *  originalPath 保留用户最初选择的路径仅供展示（原文件可能被删/移动）。 */
 export interface MediaInput {
   /** first_frame=i2v 首帧；reference_image=r2v 参考图；video=video-edit 输入视频 */
   type: 'first_frame' | 'reference_image' | 'video';
   source: { kind: 'file'; path: string } | { kind: 'url'; url: string };
+  originalPath?: string;
 }
 
 /** 一次视频生成请求的参数（UI 收集，传给 main） */
@@ -61,31 +64,30 @@ export interface AppConfig {
   };
 }
 
-/** 任务记录（持久化到 SQLite） */
-export interface TaskRecord {
+/** 任务（容器）。一个任务在创建时固定能力类型，内含 0..N 次生成（Generation）。 */
+export interface Task {
+  id: string;
+  name: string; // 占位名或首次生成 prompt 的截断（见 deriveTaskName）
+  capability: Capability; // 创建时固定，详情页不再切换
+  createdAt: string; // ISO
+  updatedAt: string; // ISO
+}
+
+/** 单次生成记录（持久化到 SQLite 的 generations 表）。
+ *  即 v1 的 TaskRecord，新增 taskId 外键指向所属 Task。 */
+export interface Generation {
   localId: string; // 客户端生成的本地 ID
-  taskId?: string; // HappyHorse 返回的 task_id
+  taskId: string; // 所属任务（Task.id）
   status: TaskStatus;
   params: GenParams;
   profileId: string;
   createdAt: string; // ISO
   updatedAt: string; // ISO
+  taskRemoteId?: string; // HappyHorse 返回的 task_id（远端）
   videoUrl?: string; // 成功后的远端 URL（24h 有效）
   localVideoPath?: string; // 下载落盘后的本地路径
   errorCode?: string;
   errorMessage?: string;
-}
-
-/** 生成历史项 */
-export interface HistoryItem {
-  id: string;
-  localId: string;
-  capability: Capability;
-  prompt?: string;
-  params: GenParams;
-  localVideoPath: string;
-  thumbnailPath?: string;
-  createdAt: string;
 }
 
 /** 参数校验结果 */

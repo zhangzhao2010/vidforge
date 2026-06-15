@@ -1,7 +1,7 @@
 // U3 task-engine — Poller
 // 按节流间隔轮询单个任务状态，遵守 RPS；检测 24h 过期；回报状态变化。
 
-import type { TaskRecord } from '@shared/types';
+import type { Generation } from '@shared/types';
 import { POLL_INTERVAL_MS, TASK_TTL_MS } from '@shared/capabilities';
 
 export type PollCallback = (localId: string) => Promise<void>;
@@ -35,8 +35,8 @@ export class Poller {
     this.timers.clear();
   }
 
-  /** 任务是否已超 24h（基于 createdAt） */
-  static isExpired(record: TaskRecord, now: number): boolean {
+  /** 生成是否已超 24h（基于 createdAt） */
+  static isExpired(record: Generation, now: number): boolean {
     return now - new Date(record.createdAt).getTime() > TASK_TTL_MS;
   }
 }

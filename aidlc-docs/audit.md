@@ -131,3 +131,12 @@ https://help.aliyun.com/zh/model-studio/happyhorse-video-edit-api-reference"
 **User Input**: "git push -u origin feat/initial-implementation" (executed by user) + "第一版本功能测试通过。整理一下各种文档和开发记录啥的,然后开启新session以进行新的迭代"
 **AI Response**: "User verified v1 works on local Mac/Windows. Branch feat/initial-implementation committed (db57f06) and pushed to origin. Wrapping up: updated aidlc-state.md to v1 COMPLETE, wrote dev-log / iteration handoff doc, saved persistent memories for next-session continuity. Noted new resources/ dir (2 sample images for i2v demo) appeared from user's local testing."
 **Context**: v1 shipped — closing out session, preparing for v2 iteration in a new session
+
+---
+
+## v2 Iteration — Task-centric Refactor (Requirements + Construction, Autonomous)
+**Timestamp**: 2026-06-15T16:00:00Z
+**User Input**: "现在我要进行下一版本迭代：1. 新建任务流程：左侧导航栏顶部有一个"创建任务"按钮，点击按钮后弹窗选择视频生成类型（文生视频，图生视频，参考生视频，视频编辑），确定后新建任务 2. 任务列表：左侧导航栏有点击"任务"可以展开折叠层，折叠层列举了历史所有任务，列表显示任务名称（根据任务生成的） 3. 任务详情页：参考 ./resources/ 下图片截图，左侧是配置参数，右侧是生成结果，每个任务可以多次生成，每个任务同时只能有一个生成在运行（第一个视频生成完了才能进行第二次提交），生成的视频在生成结果模型竖向排列（带生成配置，提示词，参考图片，参考视频），生成的视频要能直接在应用内播放。 4. 左侧导航栏的"历史"就不需要了"
+**Clarifications (AskUserQuestion)**: 并发策略=全局同时只跑一个；旧数据=清空重来；任务命名=提示词优先空则占位；截图/类型=类型创建时固定、详情页无顶部能力切换、截图仅借鉴左配置右结果竖卡布局；空任务名=占位名首次生成后自动改名。
+**AI Response**: "实现两层领域模型 Task(容器)+Generation(单次,旧TaskRecord重命名+taskId外键)。关键技术决策：MAX_CONCURRENT 3→1 全局串行；新增 vidforge-media:// 自定义协议解决 sandbox 下本地视频/图片播放（不动 webSecurity）；提交时素材拷贝进 userData/assets 持久化（防原文件删除后结果卡裂图，含目录穿越防护）；移除 history 表/导航，结果即 generations 中 COMPLETED 项。改动 shared(types/ipc/capabilities)、main(Persistence双表/TaskEngine/Poller/MediaStore/mediaProtocol/Services/IpcGateway/index)、preload、renderer(store/AppShell/TaskDetailView/GenerationCard/CreateTaskModal/i18n，删除 CapabilityForms/TaskQueuePanel/HistoryLibrary)。测试：重写集成测试(含并发=1串行断言)，新增 deriveTaskName PBT 与 mediaProtocol 路径穿越 PBT。PBT 抓出真实 bug：startsWith('..') 误杀 '..a' 合法文件名 → 改按路径段判断。结果：27 tests pass(原15→27)，typecheck pass，electron-vite build pass。"
+**Context**: v2 CONSTRUCTION complete — code + tests + build green; awaiting user local GUI verification

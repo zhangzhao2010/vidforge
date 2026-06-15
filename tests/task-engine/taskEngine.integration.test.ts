@@ -1,27 +1,42 @@
 // 集成测试 U3 task-engine（普通示例测试，非 PBT）：
-// 用内存 Persistence 桩 + mock client/keyVault/config，验证 提交→轮询→成功→下载 全链路。
+// 用内存 Persistence 桩 + mock client/keyVault/config，验证：
+//  - 任务容器创建 + 提交→轮询→成功→下载 全链路
+//  - 全局并发=1 串行约束（第二个生成在第一个完成前不会并发提交）
+//  - 失败可重试
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TaskEngine } from '../../src/main/task-engine/TaskEngine';
 import { Poller } from '../../src/main/task-engine/Poller';
-import type { GenParams, Profile, TaskRecord, TaskQueryResult } from '../../src/shared/types';
+import type { GenParams, Profile, Task, Generation, TaskQueryResult } from '../../src/shared/types';
 
 // 极简内存 Persistence（实现 TaskEngine 用到的方法子集）
 class MemPersistence {
-  tasks = new Map<string, TaskRecord>();
-  history: any[] = [];
-  upsertTask(t: TaskRecord) { this.tasks.set(t.localId, { ...t }); }
-  getTask(id: string) { const t = this.tasks.get(id); return t ? { ...t } : undefined; }
-  listTasks() { return [...this.tasks.values()]; }
-  listUnfinishedTasks() { return this.listTasks().filter((t) => ['QUEUED', 'SUBMITTING', 'PENDING', 'RUNNING', 'DOWNLOADING'].includes(t.status)); }
-  insertHistory(h: any) { this.history.push(h); }
+  containers = new Map<string, Task>();
+  gens = new Map<string, Generation>();
+
+  upsertTaskContainer(t: Task) { this.containers.set(t.id, { ...t }); }
+  getTaskContainer(id: string) { const t = this.containers.get(id); return t ? { ...t } : undefined; }
+  listTaskContainers() { return [...this.containers.values()]; }
+  deleteTaskContainer(id: string) {
+    this.containers.delete(id);
+    for (const [k, g] of this.gens) if (g.taskId === id) this.gens.delete(k);
+  }
+
+  upsertGeneration(g: Generation) { this.gens.set(g.localId, { ...g }); }
+  getGeneration(id: string) { const g = this.gens.get(id); return g ? { ...g } : undefined; }
+  listGenerations() { return [...this.gens.values()]; }
+  listGenerationsByTask(taskId: string) { return this.listGenerations().filter((g) => g.taskId === taskId); }
+  listUnfinishedGenerations() {
+    return this.listGenerations().filter((g) => ['QUEUED', 'SUBMITTING', 'PENDING', 'RUNNING', 'DOWNLOADING'].includes(g.status));
+  }
+  deleteGeneration(id: string) { this.gens.delete(id); }
 }
 
 const profile: Profile = { id: 'p1', name: 'beijing', region: 'cn-beijing' };
 
 function makeEngine(queryResults: TaskQueryResult[]) {
   const persistence = new MemPersistence();
-  const poller = new Poller(() => Promise.resolve(), 999_999); // 手动驱动 pollOnce，不靠定时器
+  const poller = new Poller(() => Promise.resolve(), 999_999); // 手动驱动 pollOnce
   const config = {
     listProfiles: () => [profile],
     getActiveProfile: () => profile,
@@ -41,22 +56,26 @@ function makeEngine(queryResults: TaskQueryResult[]) {
   return { engine, persistence, client };
 }
 
-describe('TaskEngine integration', () => {
+describe('TaskEngine integration (v2 Task/Generation)', () => {
   let params: GenParams;
   beforeEach(() => {
-    params = { capability: 't2v', prompt: 'hello' };
+    params = { capability: 't2v', prompt: 'hello world prompt' };
   });
 
-  it('提交后进入 PENDING 并获得 task_id', async () => {
+  it('创建任务后提交生成进入 PENDING 并获得 task_id', async () => {
     const { engine, persistence, client } = makeEngine([]);
-    const { localId } = await engine.enqueue(params, 'p1');
-    // enqueue 触发异步 #pump → #submit；等待微任务完成
-    await vi.waitFor(() => {
-      const t = persistence.getTask(localId)!;
-      expect(t.status).toBe('PENDING');
-    });
+    const task = engine.createTask('t2v', 'unnamed::t2v::x');
+    const { localId } = await engine.enqueue(task.id, params, 'p1');
+    await vi.waitFor(() => expect(persistence.getGeneration(localId)!.status).toBe('PENDING'));
     expect(client.submit).toHaveBeenCalledOnce();
-    expect(persistence.getTask(localId)!.taskId).toBe('t1');
+    expect(persistence.getGeneration(localId)!.taskRemoteId).toBe('t1');
+  });
+
+  it('首次生成的 prompt 回填占位任务名', async () => {
+    const { engine, persistence } = makeEngine([]);
+    const task = engine.createTask('t2v', 'unnamed::t2v::x');
+    await engine.enqueue(task.id, params, 'p1');
+    expect(persistence.getTaskContainer(task.id)!.name).toBe('hello world prompt');
   });
 
   it('全链路：PENDING→RUNNING→SUCCEEDED→下载→COMPLETED', async () => {
@@ -66,30 +85,48 @@ describe('TaskEngine integration', () => {
     ]);
     engine.setDownloadFn(async () => '/tmp/v.mp4');
 
-    const { localId } = await engine.enqueue(params, 'p1');
-    await vi.waitFor(() => expect(persistence.getTask(localId)!.status).toBe('PENDING'));
+    const task = engine.createTask('t2v', 'unnamed::t2v::x');
+    const { localId } = await engine.enqueue(task.id, params, 'p1');
+    await vi.waitFor(() => expect(persistence.getGeneration(localId)!.status).toBe('PENDING'));
 
-    await engine.pollOnce(localId); // → RUNNING
-    expect(persistence.getTask(localId)!.status).toBe('RUNNING');
+    await engine.pollOnce(localId);
+    expect(persistence.getGeneration(localId)!.status).toBe('RUNNING');
 
-    await engine.pollOnce(localId); // → SUCCEEDED → DOWNLOADING → COMPLETED
-    await vi.waitFor(() => expect(persistence.getTask(localId)!.status).toBe('COMPLETED'));
-    expect(persistence.getTask(localId)!.localVideoPath).toBe('/tmp/v.mp4');
-    expect(persistence.history.length).toBe(0); // 下载在 MediaStore，桩 downloadFn 不写 history
+    await engine.pollOnce(localId);
+    await vi.waitFor(() => expect(persistence.getGeneration(localId)!.status).toBe('COMPLETED'));
+    expect(persistence.getGeneration(localId)!.localVideoPath).toBe('/tmp/v.mp4');
   });
 
-  it('查询返回 FAILED 时任务置为 FAILED 并可重试', async () => {
+  it('全局并发=1：第二个生成在第一个完成前保持 QUEUED，不并发提交', async () => {
+    const { engine, persistence, client } = makeEngine([]);
+    const task = engine.createTask('t2v', 'unnamed::t2v::x');
+    const { localId: g1 } = await engine.enqueue(task.id, params, 'p1');
+    await vi.waitFor(() => expect(persistence.getGeneration(g1)!.status).toBe('PENDING'));
+
+    const { localId: g2 } = await engine.enqueue(task.id, params, 'p1');
+    // g1 仍 active（PENDING），g2 不应被提交
+    await new Promise((r) => setTimeout(r, 20));
+    expect(persistence.getGeneration(g2)!.status).toBe('QUEUED');
+    expect(client.submit).toHaveBeenCalledOnce();
+
+    // g1 取消（释放额度）→ g2 被泵起提交
+    await engine.cancel(g1);
+    await vi.waitFor(() => expect(persistence.getGeneration(g2)!.status).toBe('PENDING'));
+    expect(client.submit).toHaveBeenCalledTimes(2);
+  });
+
+  it('查询返回 FAILED 时生成置为 FAILED 并可重试', async () => {
     const { engine, persistence } = makeEngine([
       { taskId: 't1', status: 'FAILED', errorCode: 'InvalidParameter', errorMessage: 'bad' }
     ]);
-    const { localId } = await engine.enqueue(params, 'p1');
-    await vi.waitFor(() => expect(persistence.getTask(localId)!.status).toBe('PENDING'));
+    const task = engine.createTask('t2v', 'unnamed::t2v::x');
+    const { localId } = await engine.enqueue(task.id, params, 'p1');
+    await vi.waitFor(() => expect(persistence.getGeneration(localId)!.status).toBe('PENDING'));
     await engine.pollOnce(localId);
-    expect(persistence.getTask(localId)!.status).toBe('FAILED');
-    expect(persistence.getTask(localId)!.errorCode).toBe('InvalidParameter');
+    expect(persistence.getGeneration(localId)!.status).toBe('FAILED');
+    expect(persistence.getGeneration(localId)!.errorCode).toBe('InvalidParameter');
 
     await engine.retry(localId);
-    // retry 后回到 QUEUED 再被 pump 重新提交 → PENDING
-    await vi.waitFor(() => expect(persistence.getTask(localId)!.status).toBe('PENDING'));
+    await vi.waitFor(() => expect(persistence.getGeneration(localId)!.status).toBe('PENDING'));
   });
 });

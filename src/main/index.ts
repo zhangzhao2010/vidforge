@@ -1,9 +1,11 @@
 // main 进程入口：创建窗口、装配各单元、注册 IPC、启动恢复。
 
-import { app, BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow, shell, protocol, net } from 'electron';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 import { Persistence } from './task-engine/Persistence';
+import { resolveMediaPath } from './media-store/mediaProtocol';
 import { ConfigManager } from './core-config/ConfigManager';
 import { KeyVault } from './core-config/KeyVault';
 import { HappyHorseClient } from './api-client/HappyHorseClient';
@@ -48,9 +50,13 @@ function createWindow(): void {
 }
 
 function bootstrap(): void {
+  const userData = app.getPath('userData');
   // 数据库放 userData 目录
-  const dbPath = join(app.getPath('userData'), 'vidforge.db');
+  const dbPath = join(userData, 'vidforge.db');
   persistence = new Persistence(dbPath);
+
+  // vidforge-media:// 协议：把 userData 下的视频/素材喂给 renderer 的 <video>/<img>
+  registerMediaProtocol(userData);
 
   // 装配各单元（自底向上）
   const config = new ConfigManager(persistence);
@@ -60,8 +66,8 @@ function bootstrap(): void {
   // Poller 与 TaskEngine 互相依赖：先用占位回调建 Poller，建好 engine 后再绑定。
   const poller = new Poller((localId) => engine.pollOnce(localId));
   const engine: TaskEngine = new TaskEngine(persistence, poller, config, keyVault, client, builder);
-  const media = new MediaStore(persistence, config);
-  engine.setDownloadFn((task) => media.download(task));
+  const media = new MediaStore(config, join(userData, 'assets'));
+  engine.setDownloadFn((gen) => media.download(gen));
 
   const services = new Services(config, keyVault, engine, persistence, media);
   const gateway = new IpcGateway(services, engine, () => mainWindow);
@@ -70,6 +76,23 @@ function bootstrap(): void {
   // 启动恢复未完成任务
   void engine.recoverOnStartup();
 }
+
+/** 注册受限的本地媒体协议（仅允许 userData 子路径，防目录穿越） */
+function registerMediaProtocol(userDataDir: string): void {
+  protocol.handle('vidforge-media', async (request) => {
+    const filePath = resolveMediaPath(request.url, userDataDir);
+    if (!filePath) return new Response('Forbidden', { status: 403 });
+    return net.fetch(pathToFileURL(filePath).toString());
+  });
+}
+
+// 必须在 app ready 前声明自定义协议的特权（流式、支持 fetch、绕过 CSP）
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'vidforge-media',
+    privileges: { secure: true, stream: true, supportFetchAPI: true, bypassCSP: true }
+  }
+]);
 
 app.whenReady().then(() => {
   bootstrap();

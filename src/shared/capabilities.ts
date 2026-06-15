@@ -72,3 +72,17 @@ export const R2V_MAX_IMAGES = 9;
 /** 轮询参数 */
 export const POLL_INTERVAL_MS = 15_000; // 文档建议 15s
 export const TASK_TTL_MS = 24 * 60 * 60 * 1000; // task_id / video_url 24h 有效期
+
+/** 任务名截断长度（取首次 prompt 前 N 字） */
+export const TASK_NAME_MAX_LEN = 20;
+
+/**
+ * 由首次生成的 prompt 派生任务名；prompt 为空（如 i2v 可不填）时返回 null，
+ * 调用方应改用占位名（i18n: task.unnamed）。纯函数，便于 PBT。
+ */
+export function deriveTaskName(prompt: string | undefined): string | null {
+  const trimmed = prompt?.trim();
+  if (!trimmed) return null;
+  const oneLine = trimmed.replace(/\s+/g, ' ');
+  return oneLine.length > TASK_NAME_MAX_LEN ? oneLine.slice(0, TASK_NAME_MAX_LEN) + '…' : oneLine;
+}
