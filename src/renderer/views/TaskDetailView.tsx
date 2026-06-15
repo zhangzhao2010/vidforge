@@ -12,12 +12,15 @@ import { useStore } from '../store/useStore';
 const IMAGE_FILTER = [{ name: 'Image', extensions: ['jpg', 'jpeg', 'png', 'webp', 'bmp'] }];
 const VIDEO_FILTER = [{ name: 'Video', extensions: ['mp4', 'mov', 'webm'] }];
 
+// 稳定的空数组引用：避免 selector 每次返回新 [] 触发 useSyncExternalStore 无限循环
+const EMPTY: never[] = [];
+
 export function TaskDetailView({ task }: { task: Task }) {
   const { t } = useTranslation();
   const cap = task.capability;
-  const generations = useStore((s) => s.generationsByTask[task.id] ?? []);
+  const generations = useStore((s) => s.generationsByTask[task.id] ?? EMPTY);
   const refreshGenerations = useStore((s) => s.refreshGenerations);
-  const hasActive = useStore((s) => s.hasActiveGeneration)();
+  const hasActive = useStore((s) => s.hasActiveGeneration());
 
   const [prompt, setPrompt] = useState('');
   const [media, setMedia] = useState<MediaInput[]>([]);
