@@ -55,11 +55,12 @@ function bootstrap(): void {
   const dbPath = join(userData, 'vidforge.db');
   persistence = new Persistence(dbPath);
 
-  // vidforge-media:// 协议：把 userData 下的视频/素材喂给 renderer 的 <video>/<img>
-  registerMediaProtocol(userData);
-
   // 装配各单元（自底向上）
   const config = new ConfigManager(persistence);
+
+  // vidforge-media:// 协议：把 userData（参考素材）+ downloadDir（结果视频）下的文件
+  // 喂给 renderer 的 <video>/<img>。downloadDir 用户可改，故每次请求动态读取。
+  registerMediaProtocol(() => [userData, config.getConfig().downloadDir]);
   const keyVault = new KeyVault();
   const client = new HappyHorseClient();
   const builder = new RequestBuilder();
@@ -77,10 +78,13 @@ function bootstrap(): void {
   void engine.recoverOnStartup();
 }
 
-/** 注册受限的本地媒体协议（仅允许 userData 子路径，防目录穿越） */
-function registerMediaProtocol(userDataDir: string): void {
+/**
+ * 注册受限的本地媒体协议（仅允许给定根目录的子路径，防目录穿越）。
+ * @param allowedRoots 每次请求时求值，返回允许访问的根目录列表（userData + 当前 downloadDir）。
+ */
+function registerMediaProtocol(allowedRoots: () => string[]): void {
   protocol.handle('vidforge-media', async (request) => {
-    const filePath = resolveMediaPath(request.url, userDataDir);
+    const filePath = resolveMediaPath(request.url, allowedRoots());
     if (!filePath) return new Response('Forbidden', { status: 403 });
     return net.fetch(pathToFileURL(filePath).toString());
   });

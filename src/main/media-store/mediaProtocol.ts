@@ -10,10 +10,11 @@ import { resolve, relative, isAbsolute, sep } from 'node:path';
 /**
  * 把请求 URL 解析为安全的本地文件绝对路径；非法/越界返回 null。
  * 纯函数，便于单测（不触碰 electron/fs）。
- * @param requestUrl  形如 'vidforge-media:///%2Fhome%2Fuser%2F...'
- * @param userDataDir 允许访问的根目录（userData）
+ * @param requestUrl   形如 'vidforge-media:///%2Fhome%2Fuser%2F...'
+ * @param allowedRoots 允许访问的根目录；可传单个（userData）或多个（userData + 用户下载目录）。
+ *                     只要 candidate 落在任一根之内即放行。
  */
-export function resolveMediaPath(requestUrl: string, userDataDir: string): string | null {
+export function resolveMediaPath(requestUrl: string, allowedRoots: string | string[]): string | null {
   let pathname: string;
   try {
     pathname = new URL(requestUrl).pathname;
@@ -25,13 +26,15 @@ export function resolveMediaPath(requestUrl: string, userDataDir: string): strin
   if (!decoded) return null;
 
   const candidate = resolve(decoded);
-  const root = resolve(userDataDir);
+  const roots = (Array.isArray(allowedRoots) ? allowedRoots : [allowedRoots]).map((r) => resolve(r));
 
-  // 必须位于 root 之内（含 root 本身的子路径）。
+  // 必须位于某个 root 之内（含 root 本身的子路径）。
   // 注意按路径段判断 '..'，不能用 startsWith('..') —— 否则会误杀 '..a' 这类合法文件名。
-  const rel = relative(root, candidate);
-  const escapes = rel === '..' || rel.startsWith('..' + sep);
-  const inside = rel === '' || (!escapes && !isAbsolute(rel));
+  const inside = roots.some((root) => {
+    const rel = relative(root, candidate);
+    const escapes = rel === '..' || rel.startsWith('..' + sep);
+    return rel === '' || (!escapes && !isAbsolute(rel));
+  });
   return inside ? candidate : null;
 }
 
