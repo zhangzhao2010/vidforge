@@ -1,0 +1,41 @@
+# --- Secrets / local config (NEVER commit) ---
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+secrets.json
+
+# --- Node / Electron ---
+node_modules/
+dist/
+out/
+build/
+release/
+.vite/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- Electron build output ---
+app/dist/
+*.asar
+
+# --- Test / coverage ---
+coverage/
+.nyc_output/
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# --- Local user data (downloaded videos, task db during dev) ---
+/local-data/
+*.local
