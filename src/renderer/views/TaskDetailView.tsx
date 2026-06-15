@@ -2,12 +2,54 @@
 // 串行约束：全局已有生成在跑时，提交按钮禁用并提示。
 
 import { useEffect, useRef, useState } from 'react';
-import { Row, Col, Card, Form, Input, Button, Space, Tag, Empty, message, Tooltip, Alert } from 'antd';
+import { Row, Col, Card, Form, Input, Button, Space, Tag, Empty, message, Tooltip, Alert, Image } from 'antd';
 import { useTranslation } from 'react-i18next';
 import type { Task, GenParams, MediaInput } from '@shared/types';
 import { ParameterPanel } from '../components/ParameterPanel';
 import { GenerationCard } from '../components/GenerationCard';
 import { useStore } from '../store/useStore';
+
+const fileName = (p: string) => p.split(/[/\\]/).pop();
+
+/** 表单素材缩略图：图片文件读成 data URL 显示缩略图，视频/URL 显示文件名 Tag。可删除。
+ *  图片走 readImageDataUrl 而非 vidforge-media:// —— 未提交素材是原始磁盘路径，不在协议放行根内。 */
+function MediaThumb({ item, onRemove }: { item: MediaInput; onRemove: () => void }) {
+  const [dataUrl, setDataUrl] = useState<string | null>(null);
+  const isImageFile = item.type !== 'video' && item.source.kind === 'file';
+  const filePath = item.source.kind === 'file' ? item.source.path : undefined;
+
+  useEffect(() => {
+    if (!isImageFile || !filePath) return;
+    let alive = true;
+    void window.vidforge.readImageDataUrl(filePath).then((url) => {
+      if (alive) setDataUrl(url);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [isImageFile, filePath]);
+
+  // 图片成功读出 → 缩略图（带删除角标）；否则（视频/URL/读失败）→ 文件名 Tag
+  if (isImageFile && dataUrl) {
+    return (
+      <div style={{ position: 'relative', display: 'inline-block' }}>
+        <Image src={dataUrl} width={72} height={72} style={{ objectFit: 'cover', borderRadius: 4 }} />
+        <Tag
+          closable
+          onClose={onRemove}
+          style={{ position: 'absolute', top: 2, right: 2, margin: 0, padding: '0 2px', opacity: 0.85 }}
+        />
+      </div>
+    );
+  }
+
+  const label = item.source.kind === 'file' ? fileName(item.source.path) : item.source.url;
+  return (
+    <Tag closable onClose={onRemove}>
+      [{item.type}] {label}
+    </Tag>
+  );
+}
 
 const IMAGE_FILTER = [{ name: 'Image', extensions: ['jpg', 'jpeg', 'png', 'webp', 'bmp'] }];
 const VIDEO_FILTER = [{ name: 'Video', extensions: ['mp4', 'mov', 'webm'] }];
@@ -77,13 +119,13 @@ export function TaskDetailView({ task }: { task: Task }) {
   };
 
   const mediaList = (
-    <Space wrap>
-      {media.map((m, i) => (
-        <Tag key={i} closable onClose={() => setMedia(media.filter((_, j) => j !== i))}>
-          [{m.type}] {m.source.kind === 'file' ? m.source.path.split(/[/\\]/).pop() : m.source.url}
-        </Tag>
-      ))}
-    </Space>
+    <Image.PreviewGroup>
+      <Space wrap>
+        {media.map((m, i) => (
+          <MediaThumb key={i} item={m} onRemove={() => setMedia(media.filter((_, j) => j !== i))} />
+        ))}
+      </Space>
+    </Image.PreviewGroup>
   );
 
   const submitBtn = (

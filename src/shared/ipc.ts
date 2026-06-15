@@ -25,6 +25,7 @@ export const IPC = {
   PROFILE_DELETE: 'profile:delete',
   PROFILE_SET_ACTIVE: 'profile:setActive',
   PICK_FILES: 'dialog:pickFiles',
+  READ_IMAGE_DATA_URL: 'media:readImageDataUrl', // 把本地图片读成 data URL，供表单 <img> 预览（含未提交的原始路径）
 
   // ---- main → renderer 事件 ----
   EVT_GENERATION_UPDATED: 'generation-updated', // 单条生成状态变更

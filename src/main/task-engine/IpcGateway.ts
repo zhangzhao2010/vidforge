@@ -2,6 +2,8 @@
 // main 进程统一 IPC 入口：注册 ipcMain.handle 命令，订阅 TaskEngine 事件推送 renderer。
 
 import { ipcMain, dialog, type BrowserWindow } from 'electron';
+import { readFile } from 'node:fs/promises';
+import { extname } from 'node:path';
 import type { GenParams, Profile, AppConfig, Task, Generation, Capability } from '@shared/types';
 import { IPC } from '@shared/ipc';
 import { AppError } from '@shared/errors';
@@ -51,6 +53,7 @@ export class IpcGateway {
     this.#handle(IPC.PICK_FILES, (_e, opts: { filters?: Electron.FileFilter[]; multi?: boolean }) =>
       this.#pickFiles(opts)
     );
+    this.#handle(IPC.READ_IMAGE_DATA_URL, (_e, path: string) => this.#readImageDataUrl(path));
 
     // 生成状态变更 → 推送 renderer
     this.engine.on('generation-updated', (g: Generation) => {
@@ -84,5 +87,29 @@ export class IpcGateway {
       filters: opts.filters
     });
     return res.canceled ? [] : res.filePaths;
+  }
+
+  // 表单素材预览：把本地图片读成 data URL。表单阶段图片可能是未提交的原始磁盘路径，
+  // 不在 vidforge-media:// 协议放行根内，故走这条 IPC 而非自定义协议。
+  // 限图片类型 + 限 20MB，避免误读大文件撑爆 IPC 序列化。
+  static readonly #IMG_MIME: Record<string, string> = {
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png': 'image/png',
+    '.webp': 'image/webp',
+    '.bmp': 'image/bmp'
+  };
+  static readonly #MAX_IMG_BYTES = 20 * 1024 * 1024;
+
+  async #readImageDataUrl(path: string): Promise<string | null> {
+    const mime = IpcGateway.#IMG_MIME[extname(path).toLowerCase()];
+    if (!mime) return null;
+    try {
+      const buf = await readFile(path);
+      if (buf.byteLength > IpcGateway.#MAX_IMG_BYTES) return null;
+      return `data:${mime};base64,${buf.toString('base64')}`;
+    } catch {
+      return null; // 文件不存在/被删/无权限：预览降级为不显示，不抛错打断表单
+    }
   }
 }
