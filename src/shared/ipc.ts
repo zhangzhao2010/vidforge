@@ -26,6 +26,7 @@ export const IPC = {
   PROFILE_SET_ACTIVE: 'profile:setActive',
   PICK_FILES: 'dialog:pickFiles',
   READ_IMAGE_DATA_URL: 'media:readImageDataUrl', // 把本地图片读成 data URL，供表单 <img> 预览（含未提交的原始路径）
+  STAT_FILE_SIZE: 'fs:statFileSize', // 读取本地文件字节数，供表单在选择素材后前置校验大小（找不到/出错返回 null）
 
   // ---- main → renderer 事件 ----
   EVT_GENERATION_UPDATED: 'generation-updated', // 单条生成状态变更

@@ -55,6 +55,7 @@ const zh = {
     'error.config.missingKey': '当前配置缺少 API Key',
     'error.config.missingBaseUrl': '自定义地域需要填写 baseURL',
     'error.validation.failed': '参数校验失败',
+    'error.file.tooLarge': '文件超过 20MB，已忽略：{{name}}',
     'error.task.expired': '任务已超过 24 小时有效期',
     'error.download.failed': '视频下载失败',
     'error.network.error': '网络错误，请重试'
@@ -113,6 +114,7 @@ const en = {
     'error.config.missingKey': 'Active profile is missing an API Key',
     'error.config.missingBaseUrl': 'Custom region requires a baseURL',
     'error.validation.failed': 'Parameter validation failed',
+    'error.file.tooLarge': 'File exceeds 20MB, ignored: {{name}}',
     'error.task.expired': 'Task expired (24h limit)',
     'error.download.failed': 'Video download failed',
     'error.network.error': 'Network error, please retry'

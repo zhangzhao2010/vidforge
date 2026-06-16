@@ -2,7 +2,7 @@
 // main 进程统一 IPC 入口：注册 ipcMain.handle 命令，订阅 TaskEngine 事件推送 renderer。
 
 import { ipcMain, dialog, type BrowserWindow } from 'electron';
-import { readFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import { extname } from 'node:path';
 import type { GenParams, Profile, AppConfig, Task, Generation, Capability } from '@shared/types';
 import { IPC } from '@shared/ipc';
@@ -54,6 +54,7 @@ export class IpcGateway {
       this.#pickFiles(opts)
     );
     this.#handle(IPC.READ_IMAGE_DATA_URL, (_e, path: string) => this.#readImageDataUrl(path));
+    this.#handle(IPC.STAT_FILE_SIZE, (_e, path: string) => this.#statFileSize(path));
 
     // 生成状态变更 → 推送 renderer
     this.engine.on('generation-updated', (g: Generation) => {
@@ -110,6 +111,15 @@ export class IpcGateway {
       return `data:${mime};base64,${buf.toString('base64')}`;
     } catch {
       return null; // 文件不存在/被删/无权限：预览降级为不显示，不抛错打断表单
+    }
+  }
+
+  // 表单选择素材后前置校验大小：返回字节数；找不到/无权限返回 null（由提交链路兜底报错，避免误杀）。
+  async #statFileSize(path: string): Promise<number | null> {
+    try {
+      return (await stat(path)).size;
+    } catch {
+      return null;
     }
   }
 }

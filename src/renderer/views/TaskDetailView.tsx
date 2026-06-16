@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Row, Col, Card, Form, Input, Button, Space, Tag, Empty, message, Tooltip, Alert, Image } from 'antd';
 import { useTranslation } from 'react-i18next';
 import type { Task, GenParams, MediaInput } from '@shared/types';
+import { MAX_FILE_BYTES } from '@shared/capabilities';
 import { ParameterPanel } from '../components/ParameterPanel';
 import { GenerationCard } from '../components/GenerationCard';
 import { useStore } from '../store/useStore';
@@ -84,15 +85,34 @@ export function TaskDetailView({ task }: { task: Task }) {
 
   const promptRequired = cap === 't2v' || cap === 'r2v' || cap === 'video-edit';
 
+  // 选择素材后前置校验大小：>20MB 的文件直接剔除并逐个红字提示，只放行合规路径。
+  // stat 返回 null（文件读不到）时放行，交由提交链路（RequestBuilder）兜底，避免误杀。
+  const filterBySize = async (paths: string[]): Promise<string[]> => {
+    const sizes = await Promise.all(paths.map((p) => window.vidforge.statFileSize(p)));
+    const ok: string[] = [];
+    paths.forEach((p, i) => {
+      const size = sizes[i];
+      if (size != null && size > MAX_FILE_BYTES) {
+        message.error(t('error.file.tooLarge', { name: fileName(p) }));
+      } else {
+        ok.push(p);
+      }
+    });
+    return ok;
+  };
+
   const pickImages = async (multi: boolean) => {
-    const paths = await window.vidforge.pickFiles({ filters: IMAGE_FILTER, multi });
+    const picked = await window.vidforge.pickFiles({ filters: IMAGE_FILTER, multi });
+    const paths = await filterBySize(picked);
+    if (paths.length === 0) return;
     const type = cap === 'r2v' ? 'reference_image' : 'first_frame';
     const items: MediaInput[] = paths.map((p) => ({ type, source: { kind: 'file', path: p } }));
     setMedia(multi ? [...media.filter((m) => m.type === 'video'), ...items].slice(0, 9) : items);
   };
 
   const pickVideo = async () => {
-    const paths = await window.vidforge.pickFiles({ filters: VIDEO_FILTER, multi: false });
+    const picked = await window.vidforge.pickFiles({ filters: VIDEO_FILTER, multi: false });
+    const paths = await filterBySize(picked);
     if (paths[0]) {
       const others = media.filter((m) => m.type !== 'video');
       setMedia([...others, { type: 'video', source: { kind: 'file', path: paths[0] } }]);

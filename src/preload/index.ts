@@ -48,6 +48,9 @@ const api = {
   /** 把本地图片读成 data URL 供表单 <img> 预览；非图片/超限/读失败返回 null */
   readImageDataUrl: (path: string) => invoke<string | null>(IPC.READ_IMAGE_DATA_URL, path),
 
+  /** 读取本地文件字节数，供表单选择素材后前置校验大小；找不到/读失败返回 null */
+  statFileSize: (path: string) => invoke<number | null>(IPC.STAT_FILE_SIZE, path),
+
   /** 订阅单条生成更新事件，返回取消订阅函数 */
   onGenerationUpdate: (cb: (g: Generation) => void): (() => void) => {
     const listener = (_e: unknown, g: Generation) => cb(g);
